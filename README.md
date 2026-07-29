@@ -84,6 +84,7 @@ ML-PIPELINE-SUMMATIVE/
 │   └── test/
 │       ├── test_metadata.csv        # 2,023 rows (1,631 benign / 392 malignant)
 │       └── images/                  # raw jpgs — downloaded, not committed
+├── demo_images/                     # 5 sample lesion jpgs for a quick UI test
 ├── figures/                         # fig1..fig8 EDA & evaluation plots
 ├── docker/nginx.conf                # load balancer config
 ├── Dockerfile                       # single image for api + ui

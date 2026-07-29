@@ -56,6 +56,7 @@ models/*.promote_tmp.*
 # --- Editor / OS noise ---
 .vscode/
 .idea/
+.claude/
 *.swp
 .DS_Store
 Thumbs.db
