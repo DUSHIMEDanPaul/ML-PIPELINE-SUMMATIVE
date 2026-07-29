@@ -16,7 +16,7 @@ dataset (10,015 images).
 
 | Item | Link |
 |------|------|
-| 🎥 Video demo (YouTube) | _`<[[ADD YOUTUBE LINK](https://youtu.be/uDgIaXLdabg)](https://youtu.be/uDgIaXLdabg)>`_ |
+| 🎥 Video demo (YouTube) | https://youtu.be/uDgIaXLdabg |
 
 
 ---
