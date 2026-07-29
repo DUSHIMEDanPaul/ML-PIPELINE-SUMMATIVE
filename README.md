@@ -16,9 +16,8 @@ dataset (10,015 images).
 
 | Item | Link |
 |------|------|
-| 🎥 Video demo (YouTube) | _`<ADD YOUTUBE LINK>`_ |
-| 🌐 Live deployment URL | _`<ADD CLOUD URL>`_ |
-| 📦 GitHub repository | _`<ADD REPO URL>`_ |
+| 🎥 Video demo (YouTube) | _`<[ADD YOUTUBE LINK](https://youtu.be/uDgIaXLdabg)>`_ |
+
 
 ---
 
