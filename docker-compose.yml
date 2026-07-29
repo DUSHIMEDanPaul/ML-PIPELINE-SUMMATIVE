@@ -1,0 +1,100 @@
+# ---------------------------------------------------------------------------
+# HAM10000 classifier — API + UI + nginx load balancer.
+#
+#   docker compose up --build            # 1 api replica
+#   docker compose up --scale api=4      # 4 api replicas behind nginx
+#
+# Ports:
+#   http://localhost:8000   -> nginx  -> api replica(s)   (FastAPI /docs)
+#   http://localhost:8501   -> Streamlit UI
+#
+# Shared state: models/, uploads/, jobs/ and data/ are bind-mounted from the
+# host, so a retrain promotion written by ONE api replica is immediately visible
+# to every other replica and to the UI (each api process reloads on mtime change).
+# ---------------------------------------------------------------------------
+
+services:
+  # ---- FastAPI inference/retrain service (scalable) ---------------------
+  api:
+    build: .
+    image: ham10000:latest
+    # No host port: replicas share container port 8000, nginx publishes it.
+    expose:
+      - "8000"
+    environment:
+      WARM_START: "1"
+      RETRAIN_EPOCHS: "3"
+      RETRAIN_SUBSAMPLE: "1500"
+      MAX_AUC_REGRESSION: "0.005"
+      TF_CPP_MIN_LOG_LEVEL: "2"
+      TF_ENABLE_ONEDNN_OPTS: "0"
+      # Pin TF's thread pools so each replica uses ~2 cores. Without this, TF
+      # spawns one intra-op thread per host core, and a single container already
+      # saturates the CPU — extra replicas would just oversubscribe and thrash.
+      # This is what makes horizontal scaling on a multi-core host meaningful.
+      TF_NUM_INTRAOP_THREADS: "2"
+      TF_NUM_INTEROP_THREADS: "1"
+      OMP_NUM_THREADS: "2"
+    volumes:
+      - ./models:/app/models       # promoted models persist + shared across replicas
+      - ./uploads:/app/uploads     # uploaded batches shared across replicas
+      - ./jobs:/app/jobs           # retrain job state + lock file shared
+      - ./data:/app/data           # metadata + test_cache.npz for the guardrail
+    # Cap each replica at 1.5 CPUs so replicas partition the 8-core host with
+    # headroom (1->1.5, 2->3, 4->6 cores) leaving ~2 cores for nginx, the UI,
+    # the load generator and the OS. At 4 CPUs-per-replica the host saturates
+    # and tail latency explodes, so this cap is what makes scaling monotonic.
+    deploy:
+      resources:
+        limits:
+          cpus: "1.5"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+    restart: unless-stopped
+
+  # ---- nginx load balancer (single published API port) ------------------
+  nginx:
+    image: nginx:1.27-alpine
+    depends_on:
+      - api
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./docker/nginx.conf:/etc/nginx/nginx.conf:ro
+    healthcheck:
+      # Use 127.0.0.1 (not localhost): nginx listens on IPv4 only, and busybox
+      # wget resolves localhost to ::1 first, giving a false "connection refused".
+      test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:8000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+
+  # ---- Streamlit UI (talks to the API through nginx) --------------------
+  ui:
+    build: .
+    image: ham10000:latest
+    command: ["streamlit", "run", "app/ui.py",
+              "--server.port", "8501", "--server.address", "0.0.0.0",
+              "--server.headless", "true"]
+    depends_on:
+      - nginx
+    ports:
+      - "8501:8501"
+    environment:
+      # Route UI traffic through the load balancer, not a single replica.
+      API_URL: "http://nginx:8000"
+    volumes:
+      - ./data:/app/data:ro        # UI reads metadata_split.csv (Insights tab)
+      - ./figures:/app/figures:ro  # UI surfaces the evaluation figures
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8501/_stcore/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped

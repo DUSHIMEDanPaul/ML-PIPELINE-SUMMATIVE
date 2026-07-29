@@ -1,0 +1,23 @@
+# Normalise text on commit, check out with native line endings.
+* text=auto
+
+# Shell scripts and files consumed inside the Linux containers MUST stay LF.
+# A CRLF shebang makes bash fail with "bad interpreter: /bin/bash^M".
+*.sh            text eol=lf
+Dockerfile      text eol=lf
+Makefile        text eol=lf
+*.conf          text eol=lf
+*.yml           text eol=lf
+
+# PowerShell scripts are Windows-side; keep them CRLF.
+*.ps1           text eol=crlf
+
+# Binary artefacts — never diff or line-ending-convert these.
+*.keras         binary
+*.h5            binary
+*.npz           binary
+*.png           binary
+*.jpg           binary
+
+# Notebooks are JSON: treat as text but never auto-merge.
+*.ipynb         text merge=binary
